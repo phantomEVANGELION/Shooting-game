@@ -36,6 +36,8 @@ SDL_Texture* tex_battery = nullptr;//paotai
 SDL_Texture* tex_crosshair = nullptr;//zhunxing
 SDL_Texture* tex_background = nullptr;//背景
 SDL_Texture* tex_barrel_idle = nullptr;//枪管
+SDL_Texture* tex_win = nullptr;//结算
+
 
 Atlas atlas_barrel_fire;//开火
 Atlas atlas_chicken_fast;//快鸡
@@ -91,6 +93,7 @@ void load_resources()// 加载游戏资源
 	tex_crosshair = IMG_LoadTexture(renderer, "resources/crosshair.png");
 	tex_background = IMG_LoadTexture(renderer, "resources/background.png");
 	tex_barrel_idle = IMG_LoadTexture(renderer, "resources/barrel_idle.png");
+	tex_win = IMG_LoadTexture(renderer, "resources/win.png");
 	atlas_barrel_fire.load(renderer, "resources/barrel_fire_%d.png", 3);
 	atlas_chicken_fast.load(renderer, "resources/chicken_fast_%d.png", 4);
 	atlas_chicken_medium.load(renderer, "resources/chicken_medium_%d.png", 6);
@@ -121,6 +124,7 @@ void unload_resources()// 卸载游戏资源
 	SDL_DestroyTexture(tex_crosshair);
 	SDL_DestroyTexture(tex_background);
 	SDL_DestroyTexture(tex_barrel_idle);
+	SDL_DestroyTexture(tex_win);
 
 	Mix_FreeMusic(music_bgm);
 	Mix_FreeMusic(music_loss);
@@ -405,6 +409,24 @@ void mainloop()//  游戏主循环
 
 	while (!is_quit)
 	{
+		if (score == 1)
+		{
+			SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // 设置为黑色背景
+			SDL_RenderClear(renderer);                     // 清空之前的渲染内容
+			Camera camera(renderer);
+			int width_bg, height_bg;
+			SDL_QueryTexture(tex_win, nullptr, nullptr, &width_bg, &height_bg);
+			const SDL_FRect rect_win =
+			{
+				(1280 - width_bg) / 2.0f,
+				(720 - height_bg) / 2.0f,
+				(float)width_bg, (float)height_bg
+			};
+			camera.render_texture(tex_win, nullptr, &rect_win, 0, nullptr);
+			SDL_RenderPresent(renderer);
+			SDL_Delay(3000);
+			is_quit = true;
+		}
 		while (SDL_PollEvent(&event))
 		{
 			switch (event.type)
@@ -428,11 +450,6 @@ void mainloop()//  游戏主循环
 				break;
 			}
 		}
-		if (score == 50)
-		{
-			
-		}
-
 
 		steady_clock::time_point frame_start = steady_clock::now();
 		duration<float> delta = duration<float >(frame_start - last_tick);

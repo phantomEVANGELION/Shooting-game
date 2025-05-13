@@ -43,7 +43,7 @@ public:
 		timer_shake.restart();
 	}
 	void render_texture(SDL_Texture* texture,const SDL_Rect* rect_src,
-		const SDL_FRect* rect_dst , double angle,const SDL_FPoint*center)const
+		const SDL_FRect* rect_dst , double angle,const SDL_FPoint*center)const// ‰÷»æŒ∆¿Ì
 	{ 
 		SDL_FRect rect_dst_win = *rect_dst;
 		rect_dst_win.x -= position.x;
