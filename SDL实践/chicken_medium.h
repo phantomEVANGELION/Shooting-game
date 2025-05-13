@@ -8,7 +8,7 @@ public:
     ChickenMedium()
     {
         animation_run.add_frame(&atlas_chicken_medium);
-        speed_run = 50.0f;
+        speed_run = 40.0f;
     }
     ~ChickenMedium() = default;
 };

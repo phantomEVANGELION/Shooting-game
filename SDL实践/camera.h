@@ -31,8 +31,8 @@ public:
 		timer_shake.on_update(delta);
 		if (is_shaking)
 		{
-			position.x = (-50 + rand() % 100) / 50.0f * shaking_strength;
-			position.y = (-50 + rand() % 100) / 50.0f * shaking_strength;
+			position.x = (-45 + rand() % 80) / 50.0f * shaking_strength;
+			position.y = (-45 + rand() % 80) / 50.0f * shaking_strength;
 		}
 	}
 	void shake(float strength,float duration)

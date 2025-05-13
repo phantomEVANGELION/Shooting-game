@@ -369,7 +369,7 @@ void on_render(const Camera& camera)// 画面渲染
 
 	// 绘制游戏得分
 	{
-		std::string str_score = "SCORE:" + std::to_string(score);
+		std::string str_score = "ElimininationScore:" + std::to_string(score);
 		SDL_Surface* suf_score_bg = TTF_RenderUTF8_Blended(font, str_score.c_str(), { 55,55,55, 255 });
 		SDL_Surface* suf_score_fg = TTF_RenderUTF8_Blended(font, str_score.c_str(), { 255,255,255,255 });
 		SDL_Texture* tex_score_bg = SDL_CreateTextureFromSurface(renderer, suf_score_bg);
@@ -428,6 +428,12 @@ void mainloop()//  游戏主循环
 				break;
 			}
 		}
+		if (score == 50)
+		{
+			
+		}
+
+
 		steady_clock::time_point frame_start = steady_clock::now();
 		duration<float> delta = duration<float >(frame_start - last_tick);
 

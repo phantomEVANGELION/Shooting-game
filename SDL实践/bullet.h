@@ -47,5 +47,5 @@ private:
     Vector2 position;
     Vector2 velocity;
     bool is_valid = true;// 子弹是否可以移动
-    float speed = 800.0f;
+    float speed = 600.0f;
 };
