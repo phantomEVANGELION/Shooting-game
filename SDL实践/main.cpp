@@ -25,12 +25,12 @@
 #include <algorithm>
 
 Camera* camera = nullptr;
-SDL_Window*window = nullptr;
+SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
 
 bool is_quit = false;//是否退出游戏
 
-SDL_Texture* tex_heart= nullptr;//生命
+SDL_Texture* tex_heart = nullptr;//生命
 SDL_Texture* tex_bullet = nullptr;//zidan
 SDL_Texture* tex_battery = nullptr;//paotai
 SDL_Texture* tex_crosshair = nullptr;//zhunxing
@@ -46,17 +46,28 @@ Atlas atlas_explosion;//亡语
 Mix_Music* music_bgm = nullptr;//bgm
 Mix_Music* music_loss = nullptr;//死亡music
 
-Mix_Chunk* sound_hurt= nullptr;// 生命值降低音效
-Mix_Chunk*sound_fire_1 = nullptr;// 开火音效1
+Mix_Chunk* sound_hurt = nullptr;// 生命值降低音效
+Mix_Chunk* sound_fire_1 = nullptr;// 开火音效1
 Mix_Chunk* sound_fire_2 = nullptr;// 开火音效2
-Mix_Chunk * sound_fire_3 = nullptr;// 开火音效3
+Mix_Chunk* sound_fire_3 = nullptr;// 开火音效3
 Mix_Chunk* sound_explosion = nullptr;// 僵尸鸡死亡爆炸音效
-TTF_Font* font= nullptr;//得分显示字体
+TTF_Font* font = nullptr;//得分显示字体
 
 int hp = 10;//生命
 int score = 0;//得分
 std::vector < Bullet > bullet_list;//子弹列表
 std::vector < Chicken* > chicken_list;//僵尸鸡列表
+
+//新增奖励环节
+int energy = 0;                         // 当前能量值 [0,10)
+const int energy_threshold = 10;        // 达到多少进入爆发
+bool is_burst = false;                  // 是否在爆发阶段
+float burst_timer = 0.0f;               // 爆发阶段剩余时间
+const float burst_duration = 3.0f;      // 爆发持续时间（秒）
+
+// 炮管开火动画的基础帧间隔（秒），随后会在爆发时减半
+const float base_barrel_fire_interval = 0.04f;
+
 
 int num_per_gen = 2;//每次生成数量
 Timer timer_generate;//生成计时器
@@ -75,20 +86,21 @@ Animation animation_barrel_fire;//炮管开火动画
 void load_resources()// 加载游戏资源
 {
 	tex_heart = IMG_LoadTexture(renderer, "resources/heart.png");
-	tex_bullet = IMG_LoadTexture(renderer,"resources/bullet.png");
-	tex_battery = IMG_LoadTexture(renderer,"resources/battery.png");
+	tex_bullet = IMG_LoadTexture(renderer, "resources/bullet.png");
+	tex_battery = IMG_LoadTexture(renderer, "resources/battery.png");
 	tex_crosshair = IMG_LoadTexture(renderer, "resources/crosshair.png");
-	tex_background = IMG_LoadTexture(renderer,"resources/background.png");
-	tex_barrel_idle = IMG_LoadTexture(renderer,"resources/barrel_idle.png");
-	atlas_barrel_fire.load(renderer,"resources/barrel_fire_%d.png", 3);
-	atlas_chicken_fast.load(renderer,"resources/chicken_fast_%d.png", 4);
-	atlas_chicken_medium.load(renderer,"resources/chicken_medium_%d.png", 6);
-	atlas_chicken_slow.load(renderer,"resources/chicken_slow_%d.png", 8);
+	tex_background = IMG_LoadTexture(renderer, "resources/background.png");
+	tex_barrel_idle = IMG_LoadTexture(renderer, "resources/barrel_idle.png");
+	atlas_barrel_fire.load(renderer, "resources/barrel_fire_%d.png", 3);
+	atlas_chicken_fast.load(renderer, "resources/chicken_fast_%d.png", 4);
+	atlas_chicken_medium.load(renderer, "resources/chicken_medium_%d.png", 6);
+	atlas_chicken_slow.load(renderer, "resources/chicken_slow_%d.png", 8);
 	atlas_explosion.load(renderer, "resources/explosion_%d.png", 5);
+
 	
-	music_bgm = Mix_LoadMUS("resources/bgm.mp3");
+	music_bgm = Mix_LoadMUS("resources/newbgm.flac");
 	music_loss = Mix_LoadMUS("resources/loss.mp3");
-	
+
 	sound_hurt = Mix_LoadWAV("resources/hurt.wav");
 	sound_fire_1 = Mix_LoadWAV("resources/fire_1.wav");
 	sound_fire_2 = Mix_LoadWAV("resources/fire_2.wav");
@@ -109,10 +121,10 @@ void unload_resources()// 卸载游戏资源
 	SDL_DestroyTexture(tex_crosshair);
 	SDL_DestroyTexture(tex_background);
 	SDL_DestroyTexture(tex_barrel_idle);
-	
+
 	Mix_FreeMusic(music_bgm);
 	Mix_FreeMusic(music_loss);
-	
+
 	Mix_FreeChunk(sound_hurt);
 	Mix_FreeChunk(sound_fire_1);
 	Mix_FreeChunk(sound_fire_2);
@@ -122,56 +134,56 @@ void unload_resources()// 卸载游戏资源
 
 void init()// 游戏程序初始化
 {
- SDL_Init(SDL_INIT_EVERYTHING);
- IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG);
- Mix_Init(MIX_INIT_MP3);
- TTF_Init();
+	SDL_Init(SDL_INIT_EVERYTHING);
+	IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG);
+	Mix_Init(MIX_INIT_MP3);
+	TTF_Init();
 
- Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
- Mix_AllocateChannels(32);// 设置最大可用的音频通道数量
+	Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
+	Mix_AllocateChannels(32);// 设置最大可用的音频通道数量
 
- window = SDL_CreateWindow(u8"《生化危鸡》",
- SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
- 1280, 720, SDL_WINDOW_SHOWN);
+	window = SDL_CreateWindow(u8"《生化危鸡》",
+		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+		1280, 720, SDL_WINDOW_SHOWN);
 
- renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
- 
- SDL_ShowCursor(SDL_DISABLE);// 隐藏鼠标
- 
- load_resources();
- 
- camera = new Camera(renderer);
- 
- timer_generate.set_one_shot(false); 
- timer_generate.set_wait_time(1.5f);
- timer_generate.set_on_timeout([&]()
-	 {
-		 for (int i = 0; i < num_per_gen; i++)
-		 {
-			 int val = rand() % 100;
-			 Chicken* chicken = nullptr;
-			 if (val < 50)// 50%
-				 chicken = new ChickenSlow();
-			 else if (val < 80)//30 %
-				 chicken = new ChickenMedium();
-			 else//20 %
-				 chicken = new ChickenFast;
-			 chicken_list.push_back(chicken);
-		 }
-	 });
+	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
- timer_increase_num_per_gen.set_one_shot(false);
- timer_increase_num_per_gen.set_wait_time(8.0f);
- timer_increase_num_per_gen.set_on_timeout([&]()
- {num_per_gen += 1;});
-animation_barrel_fire.set_loop(false); 
-animation_barrel_fire.set_interval(0.04f);
-animation_barrel_fire.set_center(center_barrel); 
-animation_barrel_fire.add_frame(&atlas_barrel_fire);
-animation_barrel_fire.set_on_finished([&]()
-{ is_cool_down = true; });
-animation_barrel_fire.set_position({ 718, 610 });
-Mix_PlayMusic(music_bgm, -1);
+	SDL_ShowCursor(SDL_DISABLE);// 隐藏鼠标
+
+	load_resources();
+
+	camera = new Camera(renderer);
+
+	timer_generate.set_one_shot(false);
+	timer_generate.set_wait_time(1.5f);
+	timer_generate.set_on_timeout([&]()
+		{
+			for (int i = 0; i < num_per_gen; i++)
+			{
+				int val = rand() % 100;
+				Chicken* chicken = nullptr;
+				if (val < 50)// 50%
+					chicken = new ChickenSlow();
+				else if (val < 80)//30 %
+					chicken = new ChickenMedium();
+				else//20 %
+					chicken = new ChickenFast;
+				chicken_list.push_back(chicken);
+			}
+		});
+
+	timer_increase_num_per_gen.set_one_shot(false);
+	timer_increase_num_per_gen.set_wait_time(8.0f);
+	timer_increase_num_per_gen.set_on_timeout([&]()
+		{num_per_gen += 1; });
+	animation_barrel_fire.set_loop(false);
+	animation_barrel_fire.set_interval(0.04f);
+	animation_barrel_fire.set_center(center_barrel);
+	animation_barrel_fire.add_frame(&atlas_barrel_fire);
+	animation_barrel_fire.set_on_finished([&]()
+		{ is_cool_down = true; });
+	animation_barrel_fire.set_position({ 718, 610 });
+	Mix_PlayMusic(music_bgm, -1);
 }
 
 void deinit()// 游戏程序反初始化
@@ -226,7 +238,7 @@ void on_update(float delta)// 逻辑更新
 			hp -= 1;
 		}
 	}
-	
+
 	//移除无效子弹
 	bullet_list.erase(std::remove_if(
 		bullet_list.begin(), bullet_list.end(),
@@ -235,7 +247,7 @@ void on_update(float delta)// 逻辑更新
 			return bullet.can_move();
 		}),
 		bullet_list.end());
-	
+
 	// 移除无效的僵尸鸡对象
 	chicken_list.erase(std::remove_if(
 		chicken_list.begin(), chicken_list.end(),
@@ -247,12 +259,12 @@ void on_update(float delta)// 逻辑更新
 			return can_move;
 		}),
 		chicken_list.end());
-	
+
 	//对场景中的僵尸鸡按竖直坐标位置排序
 	std::sort(chicken_list.begin(), chicken_list.end(),
 		[](const Chicken* chicken_1, const Chicken* chicken_2)
 		{ return chicken_1->get_position().y < chicken_2->get_position().y;; });
-	
+
 	// 处理正在开火逻辑
 	if (!is_cool_down)
 	{
@@ -291,26 +303,26 @@ void on_update(float delta)// 逻辑更新
 		Mix_HaltMusic();
 		Mix_PlayMusic(music_loss, 0);
 		std::string msg = u8"游戏最终得分:" + std::to_string(score);
-		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, u8"游戏结束", msg.c_str(),window);
+		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, u8"游戏结束", msg.c_str(), window);
 	}
 }
 void on_render(const Camera& camera)// 画面渲染
 {
 	//绘制背景
 	{
-	int width_bg, height_bg;
-	SDL_QueryTexture(tex_background, nullptr, nullptr, &width_bg, &height_bg);
-	const SDL_FRect rect_background =
-	{
-		(1280 - width_bg) / 2.0f,
-		(720 - height_bg) / 2.0f,
-		(float)width_bg, (float)height_bg
-	};
-	camera.render_texture(tex_background, nullptr, &rect_background, 0, nullptr);
+		int width_bg, height_bg;
+		SDL_QueryTexture(tex_background, nullptr, nullptr, &width_bg, &height_bg);
+		const SDL_FRect rect_background =
+		{
+			(1280 - width_bg) / 2.0f,
+			(720 - height_bg) / 2.0f,
+			(float)width_bg, (float)height_bg
+		};
+		camera.render_texture(tex_background, nullptr, &rect_background, 0, nullptr);
 	}
 	// 绘制僵尸鸡
 	for (Chicken* chicken : chicken_list)
-		chicken ->on_render(camera);
+		chicken->on_render(camera);
 	// 绘制子弹
 	for (const Bullet& bullet : bullet_list)
 		bullet.on_render(camera);
@@ -354,7 +366,7 @@ void on_render(const Camera& camera)// 画面渲染
 			SDL_RenderCopy(renderer, tex_heart, nullptr, &rect_dst);
 		}
 	}
-	
+
 	// 绘制游戏得分
 	{
 		std::string str_score = "SCORE:" + std::to_string(score);
@@ -385,12 +397,12 @@ void on_render(const Camera& camera)// 画面渲染
 void mainloop()//  游戏主循环
 {
 	using namespace std::chrono;
-	
+
 	SDL_Event event;
-	
+
 	const nanoseconds frame_duration(1000000000 / 144);
 	steady_clock::time_point last_tick = steady_clock::now();
-	
+
 	while (!is_quit)
 	{
 		while (SDL_PollEvent(&event))
@@ -429,10 +441,10 @@ void mainloop()//  游戏主循环
 			std::this_thread::sleep_for(sleep_duration);
 	}
 }
-int main(int argc,char**argv)
+int main(int argc, char** argv)
 {
 	init();
 	mainloop();
 	deinit();
-    return 0;
+	return 0;
 }
