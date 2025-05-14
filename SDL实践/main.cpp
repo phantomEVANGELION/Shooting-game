@@ -1,6 +1,6 @@
 //非常不可思议的点是，工作目录如果按照一开始的$(ProjectDir)来，字体加载会出现问题
 // 但是改成绝对路径D:\C++编程\游戏准备\SDL实践\就没问题
-//这是第一版本
+//这是最终版本
 
 #define SDL_MAIN_HANDLED
 
@@ -435,7 +435,7 @@ void mainloop()//  游戏主循环
 
 	while (!is_quit)
 	{
-		if (score == 30)
+		if (score >= 35)
 		{
 			Mix_HaltMusic();
 			// 获取图片尺寸
@@ -455,7 +455,7 @@ void mainloop()//  游戏主循环
 			camera.render_texture(tex_win, nullptr, &rect_win, 0, nullptr);
 			SDL_RenderPresent(renderer);
 			Mix_PlayChannel(-1, sound_achieve, 0);
-			SDL_Delay(3000);
+			SDL_Delay(5000);
 			is_quit = true;
 		}
 		while (SDL_PollEvent(&event))
