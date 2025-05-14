@@ -37,6 +37,8 @@ SDL_Texture* tex_crosshair = nullptr;//zhunxing
 SDL_Texture* tex_background = nullptr;//背景
 SDL_Texture* tex_barrel_idle = nullptr;//枪管
 SDL_Texture* tex_win = nullptr;//结算
+SDL_Texture* tex_loss = nullptr;//loss
+
 
 
 Atlas atlas_barrel_fire;//开火
@@ -46,13 +48,15 @@ Atlas atlas_chicken_slow;//慢鸡
 Atlas atlas_explosion;//亡语
 
 Mix_Music* music_bgm = nullptr;//bgm
-Mix_Music* music_loss = nullptr;//死亡music
 
 Mix_Chunk* sound_hurt = nullptr;// 生命值降低音效
 Mix_Chunk* sound_fire_1 = nullptr;// 开火音效1
 Mix_Chunk* sound_fire_2 = nullptr;// 开火音效2
 Mix_Chunk* sound_fire_3 = nullptr;// 开火音效3
 Mix_Chunk* sound_explosion = nullptr;// 僵尸鸡死亡爆炸音效
+Mix_Chunk* sound_achieve = nullptr;
+Mix_Chunk* sound_loss = nullptr;
+
 TTF_Font* font = nullptr;//得分显示字体
 
 int hp = 10;//生命
@@ -94,6 +98,7 @@ void load_resources()// 加载游戏资源
 	tex_background = IMG_LoadTexture(renderer, "resources/background.png");
 	tex_barrel_idle = IMG_LoadTexture(renderer, "resources/barrel_idle.png");
 	tex_win = IMG_LoadTexture(renderer, "resources/win.png");
+	tex_loss = IMG_LoadTexture(renderer, "resources/loss.png");
 	atlas_barrel_fire.load(renderer, "resources/barrel_fire_%d.png", 3);
 	atlas_chicken_fast.load(renderer, "resources/chicken_fast_%d.png", 4);
 	atlas_chicken_medium.load(renderer, "resources/chicken_medium_%d.png", 6);
@@ -102,9 +107,10 @@ void load_resources()// 加载游戏资源
 
 	
 	music_bgm = Mix_LoadMUS("resources/newbgm.flac");
-	music_loss = Mix_LoadMUS("resources/loss.mp3");
 
 	sound_hurt = Mix_LoadWAV("resources/hurt.wav");
+	sound_loss = Mix_LoadWAV("resources/loss.wav");
+	sound_achieve = Mix_LoadWAV("resources/achieve.wav");
 	sound_fire_1 = Mix_LoadWAV("resources/fire_1.wav");
 	sound_fire_2 = Mix_LoadWAV("resources/fire_2.wav");
 	sound_fire_3 = Mix_LoadWAV("resources/fire_3.wav");
@@ -119,6 +125,7 @@ void load_resources()// 加载游戏资源
 void unload_resources()// 卸载游戏资源
 {
 	SDL_DestroyTexture(tex_heart);
+	SDL_DestroyTexture(tex_loss);
 	SDL_DestroyTexture(tex_bullet);
 	SDL_DestroyTexture(tex_battery);
 	SDL_DestroyTexture(tex_crosshair);
@@ -127,9 +134,11 @@ void unload_resources()// 卸载游戏资源
 	SDL_DestroyTexture(tex_win);
 
 	Mix_FreeMusic(music_bgm);
-	Mix_FreeMusic(music_loss);
+	
 
 	Mix_FreeChunk(sound_hurt);
+	Mix_FreeChunk(sound_loss);
+    Mix_FreeChunk(sound_achieve);
 	Mix_FreeChunk(sound_fire_1);
 	Mix_FreeChunk(sound_fire_2);
 	Mix_FreeChunk(sound_fire_3);
@@ -146,7 +155,7 @@ void init()// 游戏程序初始化
 	Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
 	Mix_AllocateChannels(32);// 设置最大可用的音频通道数量
 
-	window = SDL_CreateWindow(u8"《生化危鸡》",
+	window = SDL_CreateWindow(u8"《致敬之作》",
 		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 		1280, 720, SDL_WINDOW_SHOWN);
 
@@ -303,11 +312,28 @@ void on_update(float delta)// 逻辑更新
 	//检查是否结束
 	if (hp <= 0)
 	{
-		is_quit = true;
+		
 		Mix_HaltMusic();
-		Mix_PlayMusic(music_loss, 0);
+		// 获取图片尺寸
+		int width_bg, height_bg;
+		SDL_QueryTexture(tex_loss, nullptr, nullptr, &width_bg, &height_bg);
+
+		// 设置窗口尺寸与图片一致
+		SDL_SetWindowSize(window, width_bg, height_bg);
+
+		// 清空并设置黑色背景
+		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+		SDL_RenderClear(renderer);
+
+		// 渲染图片居中显示
+		SDL_FRect rect_win = { 0, 0, (float)width_bg, (float)height_bg };
+		Camera camera(renderer);
+		camera.render_texture(tex_loss, nullptr, &rect_win, 0, nullptr);
+		SDL_RenderPresent(renderer);
 		std::string msg = u8"游戏最终得分:" + std::to_string(score);
 		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, u8"游戏结束", msg.c_str(), window);
+		SDL_Delay(1000);
+		is_quit = true;
 	}
 }
 void on_render(const Camera& camera)// 画面渲染
@@ -409,21 +435,26 @@ void mainloop()//  游戏主循环
 
 	while (!is_quit)
 	{
-		if (score == 1)
+		if (score == 30)
 		{
-			SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // 设置为黑色背景
-			SDL_RenderClear(renderer);                     // 清空之前的渲染内容
-			Camera camera(renderer);
+			Mix_HaltMusic();
+			// 获取图片尺寸
 			int width_bg, height_bg;
 			SDL_QueryTexture(tex_win, nullptr, nullptr, &width_bg, &height_bg);
-			const SDL_FRect rect_win =
-			{
-				(1280 - width_bg) / 2.0f,
-				(720 - height_bg) / 2.0f,
-				(float)width_bg, (float)height_bg
-			};
+
+			// 设置窗口尺寸与图片一致
+			SDL_SetWindowSize(window, width_bg, height_bg);
+
+			// 清空并设置黑色背景
+			SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+			SDL_RenderClear(renderer);
+
+			// 渲染图片居中显示
+			SDL_FRect rect_win = { 0, 0, (float)width_bg, (float)height_bg };
+			Camera camera(renderer);
 			camera.render_texture(tex_win, nullptr, &rect_win, 0, nullptr);
 			SDL_RenderPresent(renderer);
+			Mix_PlayChannel(-1, sound_achieve, 0);
 			SDL_Delay(3000);
 			is_quit = true;
 		}
